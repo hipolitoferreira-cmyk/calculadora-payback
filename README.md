@@ -1,2 +1,714 @@
 # calculadora-payback
 Calculadora
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Payback – Sistemas de Armazenamento C&I | Prosolia Energy Portugal</title>
+
+    <!-- Chart.js, jsPDF & PapaParse -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        :root{
+            --clr-bg: #f5f7fa;
+            --clr-card: #ffffff;
+            --clr-primary: #667eea;
+            --clr-primary-dark: #764ba2;
+            --clr-text: #2d3748;
+            --clr-success: #48bb78;
+            --clr-warning: #ed8936;
+            --clr-error: #f56565;
+            --border-radius: 12px;
+            --shadow: 0 8px 20px rgba(0,0,0,.1);
+            --transition: .3s ease;
+        }
+
+        body{
+            margin:0;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            background:var(--clr-bg);
+            color:var(--clr-text);
+            transition:background .3s,color .3s;
+        }
+        body.dark{
+            --clr-bg:#1a202c;
+            --clr-card:#2d3748;
+            --clr-text:#edf2f7;
+        }
+
+        header{
+            text-align:center;
+            padding:20px;
+            background:var(--clr-card);
+            border-radius:var(--border-radius);
+            box-shadow:var(--shadow);
+            margin:15px auto 25px;
+            max-width:1600px;
+        }
+        header h1{
+            font-size:2.2rem;
+            margin-bottom:8px;
+            background:linear-gradient(135deg,var(--clr-primary),var(--clr-primary-dark));
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+        }
+
+        .layout{
+            display:grid;
+            grid-template-columns:400px 1fr;
+            gap:25px;
+            max-width:1600px;
+            margin:auto;
+            padding:0 15px 100px;
+        }
+        @media(max-width:1200px){
+            .layout{grid-template-columns:1fr;}
+        }
+
+        .card{
+            background:var(--clr-card);
+            border-radius:var(--border-radius);
+            padding:20px;
+            box-shadow:var(--shadow);
+            margin-bottom:15px;
+        }
+        .card h3{
+            margin:0 0 15px;
+            border-bottom:2px solid var(--clr-primary);
+            padding-bottom:8px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+        }
+        .input-grid{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:15px;
+        }
+        .input-grid.single{grid-template-columns:1fr;}
+        .input-group label{
+            display:block;
+            font-size:.9rem;
+            font-weight:600;
+            margin-bottom:4px;
+        }
+        .input-group input{
+            width:100%;
+            padding:10px;
+            border:2px solid #e2e8f0;
+            border-radius:6px;
+            font-size:13px;
+        }
+        .input-group input:focus{
+            outline:none;
+            border-color:var(--clr-primary);
+            box-shadow:0 0 0 3px rgba(102,126,234,.2);
+        }
+
+        .kpi-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+            gap:15px;
+            margin-bottom:25px;
+        }
+        .kpi-card{
+            color:#fff;
+            padding:18px;
+            border-radius:10px;
+            text-align:center;
+            box-shadow:0 4px 12px rgba(0,0,0,.15);
+            transition:transform var(--transition);
+        }
+        .kpi-card:hover{transform:translateY(-3px);}
+        .kpi-card.good{background:linear-gradient(135deg,var(--clr-success),#38a169);}
+        .kpi-card.alert{background:linear-gradient(135deg,var(--clr-error),#e53e3e);}
+        .kpi-card:not(.good):not(.alert){background:linear-gradient(135deg,var(--clr-primary),var(--clr-primary-dark));}
+
+        .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+        .tab{
+            padding:10px 18px;
+            border:none;
+            border-radius:6px;
+            background:#e2e8f0;
+            cursor:pointer;
+            font-weight:500;
+            transition:background var(--transition),color var(--transition);
+        }
+        .tab.active{
+            background:var(--clr-primary);
+            color:#fff;
+        }
+        .tab-content{display:none;}
+        .tab-content.active{display:block;}
+
+        .chart-container{height:350px;margin:15px 0;}
+        .savings-grid{display:grid;gap:12px;}
+        .savings-item{
+            background:#f7fafc;
+            padding:12px;
+            border-left:4px solid var(--clr-primary);
+            display:flex;
+            justify-content:space-between;
+            border-radius:6px;
+        }
+        body.dark .savings-item{background:#2d3748;}
+
+        .totals-section{
+            background:#edf2f7;
+            padding:15px;
+            border-radius:8px;
+            margin-top:15px;
+        }
+        .totals-row{
+            display:flex;
+            justify-content:space-between;
+            padding:8px 0;
+            border-bottom:1px solid #cbd5e0;
+        }
+        .totals-row:last-child{
+            border:none;
+            font-weight:bold;
+            font-size:1.1em;
+            color:var(--clr-primary);
+        }
+
+        .action-buttons{
+            position:fixed;
+            bottom:20px;
+            right:20px;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+            z-index:1000;
+        }
+        .action-btn{
+            width:50px;
+            height:50px;
+            border-radius:50%;
+            border:none;
+            color:#fff;
+            font-size:20px;
+            cursor:pointer;
+            box-shadow:0 4px 12px rgba(0,0,0,.3);
+            transition:transform var(--transition);
+        }
+        .action-btn:hover{transform:scale(1.1);}
+        .btn-print{background:#4a5568;}
+        .btn-report{background:var(--clr-primary);}
+        .btn-export{background:var(--clr-success);}
+        .btn-theme{background:#2d3748;}
+
+        footer{
+            text-align:center;
+            font-size:.8rem;
+            color:#718096;
+            margin:40px auto 0;
+        }
+
+        /* print */
+        @media print{
+            .action-buttons,.btn-theme{display:none;}
+            body{background:#fff;color:#000;}
+            .card{box-shadow:none;border:1px solid #ddd;}
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔋 Calculadora de Payback</h1>
+        <h2>Sistemas de Armazenamento de Energia C&I</h2>
+        <p><strong>Prosolia Energy Portugal</strong> | Análise Completa de Viabilidade Económica</p>
+    </header>
+
+    <div class="layout">
+        <!-- INPUTS -->
+        <aside>
+            <div class="card">
+                <h3>💰 Investimento Inicial (€)</h3>
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Custo das Baterias</label>
+                        <input type="number" id="batteryCost" value="120000" min="0" step="1000">
+                    </div>
+                    <div class="input-group">
+                        <label>Custo do Sistema PV</label>
+                        <input type="number" id="pvCost" value="80000" min="0" step="1000">
+                    </div>
+                    <div class="input-group">
+                        <label>Custo de Instalação</label>
+                        <input type="number" id="installationCost" value="30000" min="0" step="1000">
+                    </div>
+                    <div class="input-group">
+                        <label>Outros Custos</label>
+                        <input type="number" id="otherCosts" value="15000" min="0" step="1000">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🔧 Custos Operacionais Anuais (€)</h3>
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>O&M Sistema</label>
+                        <input type="number" id="omCost" value="3500" min="0" step="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Seguro</label>
+                        <input type="number" id="insuranceCost" value="1500" min="0" step="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Reserva Substituição (%)</label>
+                        <input type="number" id="replacementReserve" value="2" min="0" max="10" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Degradação Bateria (%/ano)</label>
+                        <input type="number" id="batteryDegradation" value="1.5" min="0" max="3" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>⚡ Consumo & Tarifas</h3>
+                <div class="input-grid single">
+                    <div class="input-group">
+                        <label>Consumo Mensal (kWh)</label>
+                        <input type="number" id="monthlyConsumption" value="45000" min="0" step="1000">
+                    </div>
+                </div>
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Tarifa Ponta (€/kWh)</label>
+                        <input type="number" id="peakTariff" value="0.2180" step="0.0001">
+                    </div>
+                    <div class="input-group">
+                        <label>Tarifa Cheia (€/kWh)</label>
+                        <input type="number" id="fullTariff" value="0.1580" step="0.0001">
+                    </div>
+                    <div class="input-group">
+                        <label>Tarifa Vazio (€/kWh)</label>
+                        <input type="number" id="offPeakTariff" value="0.1180" step="0.0001">
+                    </div>
+                    <div class="input-group">
+                        <label>Tarifa Supervazio (€/kWh)</label>
+                        <input type="number" id="superOffPeakTariff" value="0.0890" step="0.0001">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>☀️ Produção Fotovoltaica</h3>
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Potência PV (kWp)</label>
+                        <input type="number" id="pvCapacity" value="200" min="0" step="10">
+                    </div>
+                    <div class="input-group">
+                        <label>Produção específica (kWh/kWp/ano)</label>
+                        <input type="number" id="pvYield" value="1400" min="0" step="50">
+                    </div>
+                    <div class="input-group">
+                        <label>% Autoconsumo Direto</label>
+                        <input type="number" id="directSelfConsumption" value="65" min="0" max="100" step="5">
+                    </div>
+                    <div class="input-group">
+                        <label>% Excedente Produção</label>
+                        <input type="number" id="excessProduction" value="35" min="0" max="100" step="5">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🔋 Especificações da Bateria</h3>
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Capacidade Útil (kWh)</label>
+                        <input type="number" id="batteryCapacity" value="500" min="0" step="10">
+                    </div>
+                    <div class="input-group">
+                        <label>Potência (kW)</label>
+                        <input type="number" id="batteryPower" value="250" min="0" step="10">
+                    </div>
+                    <div class="input-group">
+                        <label>Eficiência Round-Trip (%)</label>
+                        <input type="number" id="batteryEfficiency" value="94" min="85" max="98" step="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Profundidade Descarga (%)</label>
+                        <input type="number" id="depthOfDischarge" value="90" min="50" max="100" step="5">
+                    </div>
+                    <div class="input-group">
+                        <label>Ciclos por Dia</label>
+                        <input type="number" id="cyclesPerDay" value="1.2" min="0.1" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Vida Útil (anos)</label>
+                        <input type="number" id="batteryLifespan" value="15" min="5" max="25" step="1">
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RESULTS -->
+        <main>
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('overview')">Visão Geral</button>
+                <button class="tab" onclick="showTab('breakdown')">Detalhado</button>
+                <button class="tab" onclick="showTab('charts')">Gráficos</button>
+                <button class="tab" onclick="showTab('summary')">Resumo</button>
+            </div>
+
+            <!-- Overview -->
+            <div id="overview" class="tab-content active">
+                <div class="kpi-grid" id="kpiGrid"></div>
+                <div class="card">
+                    <h3>📊 Estrutura Tarifária</h3>
+                    <div id="tariffGrid" class="savings-grid"></div>
+                </div>
+                <div class="card">
+                    <h3>💡 Resumo do Sistema</h3>
+                    <div id="systemSummary" class="savings-grid"></div>
+                </div>
+            </div>
+
+            <!-- Breakdown -->
+            <div id="breakdown" class="tab-content">
+                <div class="card">
+                    <h3>💰 Investimento Total</h3>
+                    <div id="investmentGrid" class="savings-grid"></div>
+                    <div class="totals-section">
+                        <div class="totals-row"><span>Subtotal Equipamentos:</span><span id="subtotalEquipment">€0k</span></div>
+                        <div class="totals-row"><span>Subtotal Instalação:</span><span id="subtotalInstallation">€0k</span></div>
+                        <div class="totals-row"><span><strong>Investimento Total:</strong></span><span id="totalInvestmentDisplay"><strong>€0k</strong></span></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>📈 Poupanças Anuais</h3>
+                    <div id="savingsGrid" class="savings-grid"></div>
+                    <div class="totals-section">
+                        <div class="totals-row"><span>Total Poupanças Brutas:</span><span id="totalGross">€0k</span></div>
+                        <div class="totals-row"><span>Custos Operacionais:</span><span id="totalCosts">-€0k</span></div>
+                        <div class="totals-row"><span><strong>Poupanças Líquidas:</strong></span><span id="totalNet"><strong>€0k</strong></span></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>🔧 Custos Operacionais</h3>
+                    <div id="costsGrid" class="savings-grid"></div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div id="charts" class="tab-content">
+                <div class="card">
+                    <h3>📈 Fluxo de Caixa Acumulado (20 anos)</h3>
+                    <div class="chart-container"><canvas id="cashFlowChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>🥧 Distribuição das Poupanças</h3>
+                    <div class="chart-container"><canvas id="savingsChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3>📊 Sensibilidade – Preço da Eletricidade</h3>
+                    <div class="chart-container"><canvas id="sensitivityChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div id="summary" class="tab-content">
+                <div class="card"><div id="executiveSummary"></div></div>
+                <div class="card"><div id="technicalSpecs" class="savings-grid"></div></div>
+                <div class="card"><div id="recommendations"></div></div>
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        © 2025 Prosolia Energy Portugal – v2.0
+    </footer>
+
+    <!-- Botões flutuantes -->
+    <div class="action-buttons">
+        <button class="action-btn btn-theme" onclick="toggleTheme()" title="Alternar tema">🌗</button>
+        <button class="action-btn btn-print" onclick="window.print()" title="Imprimir">🖨️</button>
+        <button class="action-btn btn-report" onclick="generatePDF()" title="Gerar PDF">📄</button>
+        <button class="action-btn btn-export" onclick="exportCSV()" title="Exportar CSV">💾</button>
+    </div>
+
+    <script>
+        /* ===============  VARIÁVEIS GLOBAIS =============== */
+        const inputs = {};
+        const results = {};
+        let charts = {};
+
+        /* ===============  UTILS =============== */
+        const $ = sel => document.querySelector(sel);
+        const $$ = sel => document.querySelectorAll(sel);
+        const fmt = v => '€' + (v / 1000).toFixed(1) + 'k';
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        /* ===============  LEITURA DOS INPUTS =============== */
+        function readInputs() {
+            $$('input').forEach(el => inputs[el.id] = parseFloat(el.value) || 0);
+        }
+
+        /* ===============  CÁLCULOS =============== */
+        function calculate() {
+            readInputs();
+            const {
+                batteryCost, pvCost, installationCost, otherCosts,
+                omCost, insuranceCost, replacementReserve, batteryDegradation,
+                monthlyConsumption, peakTariff, fullTariff, offPeakTariff, superOffPeakTariff,
+                pvCapacity, pvYield, directSelfConsumption, excessProduction,
+                batteryCapacity, batteryEfficiency, depthOfDischarge, cyclesPerDay, batteryLifespan
+            } = inputs;
+
+            /* Investimento */
+            const totalInvestment = batteryCost + pvCost + installationCost + otherCosts;
+
+            /* Produção */
+            const pvAnnualProduction = pvCapacity * pvYield;
+            const directSelfConsumptionKwh = pvAnnualProduction * (directSelfConsumption / 100);
+            const excessProductionKwh = pvAnnualProduction * (excessProduction / 100);
+
+            /* Bateria */
+            const usableBatteryCapacity = batteryCapacity * (depthOfDischarge / 100);
+            const dailyEnergyThroughput = usableBatteryCapacity * cyclesPerDay;
+            const annualEnergyThroughput = dailyEnergyThroughput * 365;
+
+            /* Benefícios */
+            const arbitragePotential = annualEnergyThroughput * (peakTariff - superOffPeakTariff) * 0.9;
+            const autoConsumptionSavings = directSelfConsumptionKwh * peakTariff;
+            const peakShavingSavings = monthlyConsumption * 12 * 0.2 * peakTariff * 0.75;
+            const backupSavings = 4500 * 12;
+
+            /* Custos */
+            const replacementReserveCost = totalInvestment * (replacementReserve / 100);
+            const totalAnnualCosts = omCost + insuranceCost + replacementReserveCost;
+
+            const grossAnnualSavings = autoConsumptionSavings + arbitragePotential + peakShavingSavings + backupSavings;
+            const netAnnualSavings = grossAnnualSavings - totalAnnualCosts;
+
+            /* Payback com degradação */
+            let cumulative = 0;
+            let year = 0;
+            const degradation = 1 - (batteryDegradation / 100);
+            while (cumulative < totalInvestment && year < 50) {
+                cumulative += netAnnualSavings * Math.pow(degradation, year);
+                year++;
+            }
+
+            Object.assign(results, {
+                totalInvestment,
+                netAnnualSavings,
+                paybackYears: year,
+                roi: (netAnnualSavings / totalInvestment) * 100,
+                usableBatteryCapacity,
+                pvAnnualProduction,
+                dailyEnergyThroughput,
+                grossAnnualSavings,
+                totalAnnualCosts,
+                autoConsumptionSavings,
+                arbitragePotential,
+                peakShavingSavings,
+                backupSavings
+            });
+            render();
+        }
+
+        /* ===============  RENDER =============== */
+        function render() {
+            /* KPI */
+            $('#kpiGrid').innerHTML = `
+                <div class="kpi-card ${results.paybackYears < 5 ? 'good' : results.paybackYears < 8 ? '' : 'alert'}">
+                    <h4>Payback</h4><div class="value">${results.paybackYears.toFixed(1)}</div><div class="subtitle">anos</div>
+                </div>
+                <div class="kpi-card"><h4>Investimento Total</h4><div class="value">${fmt(results.totalInvestment)}</div></div>
+                <div class="kpi-card good"><h4>Poupanças Líquidas</h4><div class="value">${fmt(results.netAnnualSavings)}</div></div>
+                <div class="kpi-card"><h4>ROI Anual</h4><div class="value">${results.roi.toFixed(1)}%</div></div>
+            `;
+
+            /* Tariffs */
+            $('#tariffGrid').innerHTML = `
+                <div class="savings-item"><span>Ponta</span><span>${peakTariff.toFixed(4)} €/kWh</span></div>
+                <div class="savings-item"><span>Cheia</span><span>${fullTariff.toFixed(4)} €/kWh</span></div>
+                <div class="savings-item"><span>Vazio</span><span>${offPeakTariff.toFixed(4)} €/kWh</span></div>
+                <div class="savings-item"><span>Supervazio</span><span>${superOffPeakTariff.toFixed(4)} €/kWh</span></div>
+            `;
+
+            /* System summary */
+            $('#systemSummary').innerHTML = `
+                <div class="savings-item"><span>Capacidade Bateria</span><span>${usableBatteryCapacity.toFixed(0)} kWh</span></div>
+                <div class="savings-item"><span>Potência PV</span><span>${pvCapacity} kWp</span></div>
+                <div class="savings-item"><span>Produção Anual PV</span><span>${Math.round(pvAnnualProduction / 1000)} MWh</span></div>
+                <div class="savings-item"><span>Autoconsumo Direto</span><span>${Math.round(directSelfConsumptionKwh / 1000)} MWh</span></div>
+            `;
+
+            /* Investment */
+            $('#investmentGrid').innerHTML = `
+                <div class="savings-item"><span>Baterias</span><span>${fmt(batteryCost)}</span></div>
+                <div class="savings-item"><span>Sistema PV</span><span>${fmt(pvCost)}</span></div>
+                <div class="savings-item"><span>Instalação</span><span>${fmt(installationCost)}</span></div>
+                <div class="savings-item"><span>Outros Custos</span><span>${fmt(otherCosts)}</span></div>
+            `;
+            $('#subtotalEquipment').textContent = fmt(batteryCost + pvCost);
+            $('#subtotalInstallation').textContent = fmt(installationCost + otherCosts);
+            $('#totalInvestmentDisplay').innerHTML = `<strong>${fmt(totalInvestment)}</strong>`;
+
+            /* Savings */
+            $('#savingsGrid').innerHTML = `
+                <div class="savings-item"><span>Autoconsumo PV</span><span>${fmt(autoConsumptionSavings)}</span></div>
+                <div class="savings-item"><span>Arbitragem ToU</span><span>${fmt(arbitragePotential)}</span></div>
+                <div class="savings-item"><span>Peak Shaving</span><span>${fmt(peakShavingSavings)}</span></div>
+                <div class="savings-item"><span>Backup</span><span>${fmt(backupSavings)}</span></div>
+            `;
+            $('#totalGross').textContent = fmt(grossAnnualSavings);
+            $('#totalCosts').textContent = '-' + fmt(totalAnnualCosts);
+            $('#totalNet').innerHTML = `<strong>${fmt(netAnnualSavings)}</strong>`;
+
+            /* Costs */
+            $('#costsGrid').innerHTML = `
+                <div class="savings-item"><span>O&M</span><span>${fmt(omCost)}</span></div>
+                <div class="savings-item"><span>Seguro</span><span>${fmt(insuranceCost)}</span></div>
+                <div class="savings-item"><span>Reserva Substituição</span><span>${fmt(replacementReserveCost)}</span></div>
+            `;
+
+            /* Charts */
+            renderCharts();
+            renderSummary();
+        }
+
+        /* ===============  CHARTS =============== */
+        function renderCharts() {
+            /* Cash-flow */
+            const ctx1 = $('#cashFlowChart');
+            if (charts.cash) charts.cash.destroy();
+            const labels = Array.from({ length: 21 }, (_, i) => i);
+            const data = labels.map(y => y === 0 ? -results.totalInvestment : -results.totalInvestment + results.netAnnualSavings * y);
+            charts.cash = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Fluxo Acumulado',
+                        data,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102,126,234,.1)',
+                        fill: true
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            /* Pie */
+            const ctx2 = $('#savingsChart');
+            if (charts.pie) charts.pie.destroy();
+            charts.pie = new Chart(ctx2, {
+                type: 'pie',
+                data: {
+                    labels: ['Autoconsumo', 'Arbitragem', 'Peak Shaving', 'Backup'],
+                    datasets: [{
+                        data: [results.autoConsumptionSavings, results.arbitragePotential, results.peakShavingSavings, results.backupSavings],
+                        backgroundColor: ['#48bb78', '#4299e1', '#ed8936', '#9f7aea']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            /* Sensitivity */
+            const ctx3 = $('#sensitivityChart');
+            if (charts.sens) charts.sens.destroy();
+            const scenarios = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+            const sensData = scenarios.map(s => results.totalInvestment / (results.netAnnualSavings * s));
+            charts.sens = new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: scenarios.map(s => `${(s * 100).toFixed(0)}%`),
+                    datasets: [{
+                        label: 'Payback (anos)',
+                        data: sensData,
+                        backgroundColor: sensData.map(v => v < 5 ? '#48bb78' : v < 8 ? '#ed8936' : '#f56565')
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        /* ===============  SUMMARY & EXPORT =============== */
+        function renderSummary() {
+            $('#executiveSummary').innerHTML = `
+                <p>O sistema apresenta um payback de <strong>${results.paybackYears.toFixed(1)} anos</strong> para um investimento de <strong>${fmt(results.totalInvestment)}</strong>.</p>
+                <p>Poupanças líquidas anuais: <strong>${fmt(results.netAnnualSavings)}</strong> (ROI ${results.roi.toFixed(1)} %).</p>
+            `;
+            $('#technicalSpecs').innerHTML = `
+                <div class="savings-item"><span>Capacidade Útil</span><span>${results.usableBatteryCapacity.toFixed(0)} kWh</span></div>
+                <div class="savings-item"><span>Produção PV</span><span>${Math.round(results.pvAnnualProduction / 1000)} MWh/ano</span></div>
+                <div class="savings-item"><span>Energia Diária Bateria</span><span>${results.dailyEnergyThroughput.toFixed(0)} kWh</span></div>
+            `;
+            $('#recommendations').innerHTML = `
+                <p>Recomendações:</p>
+                <ul>
+                    <li>Considerar incentivos se payback > 7 anos.</li>
+                    <li>Monitorizar degradação da bateria.</li>
+                    <li>Avaliar integração com carregamento VE.</li>
+                </ul>
+            `;
+        }
+
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            await html2canvas(document.body).then(canvas => {
+                const img = canvas.toDataURL('image/png');
+                pdf.addImage(img, 'PNG', 10, 10, 190, 0);
+                pdf.save('payback-report.pdf');
+            });
+        }
+
+        function exportCSV() {
+            const rows = [
+                ['Item', 'Valor (€)'],
+                ['Investimento Total', results.totalInvestment],
+                ['Poupanças Líquidas/ano', results.netAnnualSavings],
+                ['Payback (anos)', results.paybackYears],
+                ['ROI Anual (%)', results.roi.toFixed(2)]
+            ];
+            const csv = Papa.unparse(rows);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'payback-data.csv';
+            link.click();
+        }
+
+        /* ===============  TEMA & TABS =============== */
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+        }
+        function showTab(id) {
+            $$('.tab-content').forEach(t => t.classList.remove('active'));
+            $$('.tab').forEach(t => t.classList.remove('active'));
+            $(id).classList.add('active');
+            event.currentTarget.classList.add('active');
+            if (id === 'charts') renderCharts();
+        }
+
+        /* ===============  INIT =============== */
+        $$('input').forEach(el => {
+            el.addEventListener('input', debounce(calculate, 400));
+        });
+        calculate();
+
+        function debounce(fn, wait) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn(...args), wait);
+            };
+        }
+    </script>
+</body>
+</html>
